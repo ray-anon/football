@@ -1,4 +1,5 @@
 import pygame
+import random
 
 vector = pygame.math.Vector2
 
@@ -21,12 +22,28 @@ grass_tile_group  = pygame.sprite.Group()
 water_tile_group = pygame.sprite.Group()
 my_player_group = pygame.sprite.Group()
 football_group = pygame.sprite.Group()
+target_group = pygame.sprite.Group()
+
+class Target(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.image.load("images/target.png")
+        self.rect = self.image.get_rect()
+        self.rect.bottomright = (WINDOW_WIDTH , random.randint(0 , WINDOW_HEIGHT - 100))
+    
+    def update(self):
+        pass
+
 
 #class Game
 class Game():
-    def __init__(self , player , football_group , football):
+    def __init__(self , player , football_group , football , target):
+        self.score = 0
+        self.lives = 10
+        
         self.player = player
         self.football_group = football_group
+        self.target = target
         self.is_kicked = False
         
         self.football = football
@@ -35,16 +52,23 @@ class Game():
         self.check_collisions()
         if self.is_kicked == True:
             self.kicked()
+            
+        if self.football.rect.left > WINDOW_WIDTH:
+            self.football.rect.topleft = (self.football.STARTING_X , self.football.STARTING_Y)
+            self.is_kicked = False
     
     def check_collisions(self):
         if pygame.sprite.spritecollide(self.player , self.football_group , False):
             self.velocity_y = self.player.velocity.x
             self.is_kicked = True
+            self.player.rect.x = 0
+            
+        if pygame.sprite.spritecollide(self.target , self.football_group , False):
+            self.target.rect.bottomright = (WINDOW_WIDTH , random.randint(0 , WINDOW_HEIGHT - 100))
     
     def kicked(self):
-        print(self.velocity_y)
         self.football.rect.x += self.football.velocity_x
-        self.football.rect.y -= self.velocity_y * 2.26
+        self.football.rect.y -= abs(self.velocity_y * 2.26)
     
 
 #class football
@@ -56,7 +80,10 @@ class Football(pygame.sprite.Sprite):
         self.rect.topleft = (x , y)
         
         self.velocity_x = 10
-        self.is_kicked =  False
+        
+        self.STARTING_X = x
+        self.STARTING_Y = y
+        
 
 #class Tile
 class Tile(pygame.sprite.Sprite):
@@ -105,11 +132,12 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.bottomleft = (x , y)
         
+        
         self.grass_tiles = grass_tiles
         self.water_tiles = water_tiles
         
         #kinematics constansts
-        self.HORIZONTAL_ACCELERATION = 0.5
+        self.HORIZONTAL_ACCELERATION = 0.44
         self.HORIZONTAL_FRICITION = 0.15
         self.VERTICAL_ACCELERATION = 0.5
         self.VERTICAL_JUMP_SPEED = 7
@@ -119,6 +147,8 @@ class Player(pygame.sprite.Sprite):
         self.acceleration = vector(0, 0)
         self.position = vector(x , y)
         
+        self.STARTING_X = x
+        self.STARTING_Y = y
         
     def update(self):
         pygame.draw.rect(display_surface , (0, 255 , 0) , self.rect , 1)
@@ -141,7 +171,7 @@ class Player(pygame.sprite.Sprite):
         if keys[pygame.K_RIGHT] and self.rect.x < 200:
             self.acceleration.x =  self.HORIZONTAL_ACCELERATION
             self.animate(self.move_right_sprites)
-        elif keys[pygame.K_LEFT] and self.rect.x > 0:
+        if keys[pygame.K_LEFT] and self.rect.x > 0:
             self.acceleration.x = -self.HORIZONTAL_ACCELERATION
             self.animate(self.move_left_sprites)
         else:
@@ -174,7 +204,7 @@ class Player(pygame.sprite.Sprite):
         else:
             self.current_spite = 0
         self.image = sprite_list[self.current_spite]
-  
+    
 tile_map = [
     [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
     [0,0,0,0,0, 4,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
@@ -192,7 +222,7 @@ tile_map = [
     [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
     [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
     [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
-    [0,0,0,0,0, 0,0,0,5,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
+    [0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0],
     [2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2, 2,2,0,0,0, 0,0,0,0,0, 2,2,2,2,2],
     [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,3,3,3, 3,3,3,3,3, 1,1,1,1,1],
     [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,3,3,3, 3,3,3,3,3, 1,1,1,1,1],
@@ -209,13 +239,18 @@ for i in range(len(tile_map)):
         if tile_map[i][j] == 4:
             player = Player(j * 32 , i * 32 + 32 , grass_tile_group , water_tile_group)
             my_player_group.add(player)
-        if tile_map[i][j] == 5:
-            football = Football(j * 32 , i * 32)
-            football_group.add(football)
+
+#football object
+football = Football(8 * 32 , 16 * 32)
+football_group.add(football)
+
+
+#target object
+target = Target()
+target_group.add(target)
 
 #game object
-my_game = Game(player , football_group , football)
-
+my_game = Game(player , football_group , football , target)
 
 #load bg image
 bg_image = pygame.image.load('images/background.png')
@@ -249,7 +284,12 @@ while run:
     
     #game object
     my_game.update() 
-          
+    
+    #target object
+    target_group.update()
+    target_group.draw(display_surface)
+    
+    
     pygame.display.update()
 
 #quit pygame
